@@ -1,0 +1,7 @@
+python-telegram-bot == 20.4
+python-telegram-bot[job-queue]
+Pillow 
+pywin32
+pyinstaller
+python-dotenv
+opencv-python
