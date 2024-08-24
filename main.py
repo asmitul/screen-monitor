@@ -18,10 +18,10 @@ load_dotenv()
 # serup .env file
 DEVELOPER_CHAT_ID = os.getenv("DEVELOPER_CHAT_ID")
 TOKEN=os.getenv("TOKEN")
-X=os.getenv("X")
-Y=os.getenv("Y")
-WIGHT=os.getenv("WIGHT")
-HEIGHT=os.getenv("HEIGHT")
+X=int(os.getenv("X",10))
+Y=int(os.getenv("Y",120))
+WIGHT=int(os.getenv("WIGHT",50))
+HEIGHT=int(os.getenv("HEIGHT",190))
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -56,6 +56,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("start")
     await context.bot.send_message(chat_id=update.effective_chat.id, text="screan monitoring started.")
     
     # screenshot original image
@@ -107,6 +108,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 
 async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("now")
     initial_image = ImageGrab.grab(bbox=(X, Y, WIGHT, HEIGHT))
     initial_image.save("Now_Image.png")
     await context.bot.send_photo(chat_id=update.effective_chat.id,photo=open("Now_Image.png",'rb'))
@@ -114,6 +116,7 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     application = ApplicationBuilder().token(TOKEN).build()
+    print("screan monitoring started.")
 
     # ...and the error handler
     application.add_error_handler(error_handler)
