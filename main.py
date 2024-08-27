@@ -19,7 +19,7 @@ load_dotenv()
 DEVELOPER_CHAT_ID = os.getenv("DEVELOPER_CHAT_ID")
 TOKEN=os.getenv("TOKEN")
 X=int(os.getenv("X",10))
-Y=int(os.getenv("Y",120))
+Y=int(os.getenv("Y",90))
 WIGHT=int(os.getenv("WIGHT",50))
 HEIGHT=int(os.getenv("HEIGHT",190))
 
