@@ -9,6 +9,8 @@ virtualenv --python python\path venv
 pip install -r requirements.txt
 ```
 
+C:/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe
+
 ## in Linux
 ```bash
 python3 -m venv venv
