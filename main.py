@@ -9,7 +9,7 @@ import os
 import cv2
 import numpy as np
 
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 from dotenv import load_dotenv
 
 import asyncio
@@ -90,7 +90,7 @@ def screenshot(bbox=None):
                 (width, height), 
                 mfcDC, 
                 (left, top), 
-                win32con.SRCCOPY | win32con.CAPTUREBLT
+                win32con.SRCCOPY
             )
             
             # 转换为PIL Image
