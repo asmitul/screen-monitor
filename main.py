@@ -23,6 +23,10 @@ Y=int(os.getenv("Y",90))
 WIGHT=int(os.getenv("WIGHT",50))
 HEIGHT=int(os.getenv("HEIGHT",190))
 
+# 改进的差异检测参数
+DIFF_THRESHOLD = int(os.getenv("DIFF_THRESHOLD", 15))  # 降低阈值，更敏感
+BLUR_KERNEL_SIZE = int(os.getenv("BLUR_KERNEL_SIZE", 3))  # 模糊核大小
+MIN_CONTOUR_AREA = int(os.getenv("MIN_CONTOUR_AREA", 5))  # 最小轮廓面积
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
@@ -54,6 +58,46 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML
     )
 
+def improved_image_comparison(img1, img2):
+    """改进的图像比较函数，更好地处理颜色变化"""
+    # 转换为灰度图
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    
+    # 应用高斯模糊减少噪声
+    gray1_blur = cv2.GaussianBlur(gray1, (BLUR_KERNEL_SIZE, BLUR_KERNEL_SIZE), 0)
+    gray2_blur = cv2.GaussianBlur(gray2, (BLUR_KERNEL_SIZE, BLUR_KERNEL_SIZE), 0)
+    
+    # 计算差异
+    diff = cv2.absdiff(gray1_blur, gray2_blur)
+    
+    # 使用自适应阈值处理
+    diff_threshold = cv2.adaptiveThreshold(
+        diff, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    
+    # 同时使用固定阈值作为备用
+    _, fixed_threshold = cv2.threshold(diff, DIFF_THRESHOLD, 255, cv2.THRESH_BINARY)
+    
+    # 合并两种阈值结果
+    combined_threshold = cv2.bitwise_or(diff_threshold, fixed_threshold)
+    
+    # 形态学操作去除噪声
+    kernel = np.ones((3, 3), np.uint8)
+    eroded = cv2.erode(combined_threshold, kernel, iterations=1)
+    dilated = cv2.dilate(eroded, kernel, iterations=2)
+    
+    # 查找轮廓
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # 过滤小轮廓
+    significant_contours = []
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > MIN_CONTOUR_AREA:
+            significant_contours.append(contour)
+    
+    return significant_contours, dilated
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("start")
@@ -74,34 +118,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         loaded_original_image = cv2.imread("original_image.png")
         loaded_current_image = cv2.imread("current_image.png")
 
-        # 将两张图片转换为灰度图像
-        gray1 = cv2.cvtColor(loaded_original_image, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(loaded_current_image, cv2.COLOR_BGR2GRAY)
-        
-        # 计算两张灰度图像的差异
-        diff = cv2.absdiff(gray1, gray2)
-
-        
-        # 对差异图像进行阈值处理，以便找到明显的不同区域
-        _, threshold = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
-
-        # 对阈值图像进行腐蚀和膨胀操作，以去除噪声并连接相邻的不同区域
-        kernel = np.ones((3, 3), np.uint8)
-        threshold = cv2.erode(threshold, kernel, iterations=2)
-        threshold = cv2.dilate(threshold, kernel, iterations=2)
-
-        # 查找不同区域的轮廓
-        contours, _ = cv2.findContours(threshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 使用改进的比较函数
+        contours, processed_diff = improved_image_comparison(loaded_original_image, loaded_current_image)
 
         # 如果有不同区域，输出不同
         if len(contours) > 0:
-            # 遍历轮廓并绘制矩形框来标记不同区域，并保存截图
-            for contour in contours:
-                    (x, y, w, h) = cv2.boundingRect(contour)
-                    cv2.rectangle(loaded_current_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    cv2.imwrite('diff_region.jpg', loaded_current_image)
+            # 创建标记图像
+            marked_image = loaded_current_image.copy()
             
-            await context.bot.send_photo(chat_id=update.effective_chat.id,photo=open("diff_region.jpg",'rb'))
+            # 遍历轮廓并绘制矩形框来标记不同区域
+            for contour in contours:
+                (x, y, w, h) = cv2.boundingRect(contour)
+                cv2.rectangle(marked_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            
+            # 保存标记的图像
+            cv2.imwrite('diff_region.jpg', marked_image)
+            
+            # 同时保存处理后的差异图像用于调试
+            cv2.imwrite('debug_diff.jpg', processed_diff)
+            
+            # 发送标记的图像
+            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open("diff_region.jpg", 'rb'))
+            
+            # 发送调试图像（可选）
+            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open("debug_diff.jpg", 'rb'), caption="Debug: Processed difference image")
+            
+            # 更新参考图像
             ImageGrab.grab(bbox=(X, Y, WIGHT, HEIGHT)).save("original_image.png")
         else:
             pass
