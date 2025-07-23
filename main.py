@@ -51,6 +51,7 @@ class Config:
     CURRENT_IMAGE_PATH = "current_image.png"
     DIFF_IMAGE_PATH = "diff_region.jpg"
     NOW_IMAGE_PATH = "Now_Image.png"
+    FULL_SCREEN_CHANGE_PATH = "full_screen_change.png"  # 新增：变化时的大截图路径
 
     @classmethod
     def validate(cls) -> bool:
@@ -134,6 +135,23 @@ class ScreenMonitor:
             logger.debug(f"Screenshot saved to {filepath}")
         except Exception as e:
             logger.error(f"Failed to take screenshot: {e}")
+            raise
+            
+    def _take_full_screenshot(self, filepath: str) -> None:
+        """Take a full screen screenshot and save it"""
+        try:
+            # 拍摄更大的区域，包含监控区域周围的更多内容
+            # 扩展监控区域，使其更大
+            expanded_x = max(0, Config.X - 200)  # 向左扩展200像素
+            expanded_y = max(0, Config.Y - 200)  # 向上扩展200像素
+            expanded_width = Config.WIDTH + 400   # 宽度增加400像素
+            expanded_height = Config.HEIGHT + 400 # 高度增加400像素
+            
+            screenshot = ImageGrab.grab(bbox=(expanded_x, expanded_y, expanded_x + expanded_width, expanded_y + expanded_height))
+            screenshot.save(filepath)
+            logger.debug(f"Full screenshot saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Failed to take full screenshot: {e}")
             raise
             
     async def _monitor_loop(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -222,7 +240,10 @@ class ScreenMonitor:
     async def _send_diff_notification(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send difference notification with image"""
         try:
-            with open(Config.DIFF_IMAGE_PATH, 'rb') as photo:
+            # 拍摄更大的截图
+            self._take_full_screenshot(Config.FULL_SCREEN_CHANGE_PATH)
+            
+            with open(Config.FULL_SCREEN_CHANGE_PATH, 'rb') as photo:
                 await context.bot.send_photo(
                     chat_id=update.effective_chat.id,
                     photo=photo,
